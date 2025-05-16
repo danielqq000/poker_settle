@@ -31,6 +31,13 @@ def init_db():
                 c.execute(f"ALTER TABLE records ADD COLUMN {col} INTEGER DEFAULT 0")
             except sqlite3.OperationalError:
                 pass
+
+        # 確保 (date, name) 是唯一的，方便使用 UPSERT
+        c.execute('''
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_records_date_name
+            ON records(date, name)
+        ''')
+
         conn.commit()
 
 def ensure_player_exists(name):
@@ -72,20 +79,24 @@ def save_table():
         return
     with sqlite3.connect(db_path) as conn:
         c = conn.cursor()
-        # 刪除當天舊資料再寫入
-        c.execute("DELETE FROM records WHERE date = ?", (current_date,))
         for name, d in table.items():
             c.execute('''
                 INSERT INTO records
                     (date, name, buy_in, cash, zelle, cash_out, payout_cash, payout_zelle)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(date, name) DO UPDATE SET
+                    buy_in = excluded.buy_in,
+                    cash = excluded.cash,
+                    zelle = excluded.zelle,
+                    cash_out = excluded.cash_out,
+                    payout_cash = excluded.payout_cash,
+                    payout_zelle = excluded.payout_zelle
             ''', (
                 current_date, name,
                 d["buy_in"], d["cash"], d["zelle"], d["cash_out"],
                 d["payout_cash"], d["payout_zelle"]
             ))
         conn.commit()
-    print(f"Saved data for {current_date}")
 
 def buy_in(name, amount):
     amount = int(amount)
@@ -190,65 +201,62 @@ def solve():
         print(f"{name}: {bal}")
     print()
 
-    # Step 4: 使用 DFS 找最少筆交易
-
-    # 將負債（欠錢的人）和正債（應收的人）分開排序
-    negatives = sorted([(name, amt) for name, amt in balances.items() if amt < 0], key=lambda x: x[1])  # 負數，從小到大
-    positives = sorted([(name, amt) for name, amt in balances.items() if amt > 0], key=lambda x: -x[1]) # 正數，從大到小
-
-    all_balances = negatives + positives
-    name_list = [x[0] for x in all_balances]
-    amount_list = [x[1] for x in all_balances]
+    # Step 4: 使用 DFS 找最少筆交易，並在每步排序最大化貪心
+    name_list = list(balances.keys())
+    amount_list = list(balances.values())
 
     n = len(amount_list)
     min_tx = float('inf')
     best_transactions = []
 
-    def dfs(start, amounts, current_transactions):
+
+    def dfs(combined, current_transactions):
         nonlocal min_tx, best_transactions
 
-        # 跳過已清零的人
-        while start < n and amounts[start] == 0:
+        # 排序（負的在前，正的在後，數值越大優先）
+        combined.sort(key=lambda x: (x[1] >= 0, -x[1] if x[1] > 0 else x[1]))
+
+        # 找第一個非零
+        start = 0
+        while start < len(combined) and combined[start][1] == 0:
             start += 1
-        if start == n:
-            # 找到更少筆交易時更新答案
+
+        if start == len(combined):
             if len(current_transactions) < min_tx:
                 min_tx = len(current_transactions)
                 best_transactions = current_transactions[:]
             return
 
-        for i in range(start + 1, n):
-            # 找債權債務相反的配對
-            if amounts[start] * amounts[i] < 0:
-                # 優先還給金額較大的債權人
-                transfer_amt = min(abs(amounts[start]), abs(amounts[i]))
+        for i in range(start + 1, len(combined)):
+            if combined[start][1] * combined[i][1] < 0:
+                transfer_amt = min(abs(combined[start][1]), abs(combined[i][1]))
 
-                original_i = amounts[i]
-                original_start = amounts[start]
+                # 儲存原始值，做回溯用
+                original_start_amt = combined[start][1]
+                original_i_amt = combined[i][1]
 
-                if amounts[start] < 0:
-                    # start 欠錢，i 收錢
-                    current_transactions.append((name_list[start], name_list[i], transfer_amt))
-                    amounts[start] += transfer_amt
-                    amounts[i] -= transfer_amt
+                if combined[start][1] < 0:
+                    # 欠錢的人轉帳給收錢的人
+                    current_transactions.append((combined[start][0], combined[i][0], transfer_amt))
+                    combined[start] = (combined[start][0], combined[start][1] + transfer_amt)
+                    combined[i] = (combined[i][0], combined[i][1] - transfer_amt)
                 else:
-                    # start 收錢，i 欠錢（理論上 start 是負，i是正，不過寫保險）
-                    current_transactions.append((name_list[i], name_list[start], transfer_amt))
-                    amounts[start] -= transfer_amt
-                    amounts[i] += transfer_amt
-                
-                dfs(start, amounts, current_transactions)
+                    current_transactions.append((combined[i][0], combined[start][0], transfer_amt))
+                    combined[start] = (combined[start][0], combined[start][1] - transfer_amt)
+                    combined[i] = (combined[i][0], combined[i][1] + transfer_amt)
+
+                dfs(combined[:], current_transactions)
 
                 # 回溯
                 current_transactions.pop()
-                amounts[start] = original_start
-                amounts[i] = original_i
+                combined[start] = (combined[start][0], original_start_amt)
+                combined[i] = (combined[i][0], original_i_amt)
 
-                # 剪枝，優化搜尋空間
-                if amounts[i] + original_start == 0:
+                if original_start_amt + original_i_amt == 0:
                     break
 
-    dfs(0, amount_list[:], [])
+    combined = [(name, amt) for name, amt in balances.items()]
+    dfs(combined, [])
 
     # Step 5: 顯示轉帳
     print("Settlement Transfers:")
@@ -276,28 +284,14 @@ def solve():
     adjusted_bank_balance = abs(final_bank_balance)
     print(f"Bank Final Balance: {adjusted_bank_balance:.0f}")
 
-
 def clear():
-    save_table()
     table.clear()
     print("Table cleared.")
 
 def history(date_str):
-    with sqlite3.connect(db_path) as conn:
-        c = conn.cursor()
-        c.execute("""
-            SELECT name, buy_in, cash, zelle, cash_out, payout_cash, payout_zelle
-              FROM records
-             WHERE date = ?
-        """, (date_str,))
-        rows = c.fetchall()
-        if not rows:
-            print("No data for that date.")
-            return
-        print(f"History for {date_str}:")
-        print("name | buy_in | cash | zelle | cash_out | payout_cash | payout_zelle")
-        for row in rows:
-            print(" | ".join(str(x) for x in row))
+    load_table()
+    show_table()
+    summary()
 
 def summary():
     if not table:
@@ -359,22 +353,28 @@ def main():
             elif cmd0 == "exit":
                 if current_date:
                     save_table()
+                    print(f"{current_date} game saved.")
                 break;
             elif not current_date:
                 print("Please start a game first: game <MM/DD>")
             elif cmd0 == "buy" and args[1].lower() == "in":
                 buy_in(args[2], args[3])
+                save_table()
             elif cmd0 == "payment":
                 payment(args[1], args[2], args[3].lower())
+                save_table()
             elif cmd0 == "cash" and args[1].lower() == "out":
                 cash_out(args[2], args[3])
+                save_table()
             elif cmd0 == "pay" and args[1].lower() == "out":
                 pay_out(args[2], args[3], args[4].lower())
+                save_table()
             elif cmd0 == "remove":
                 if len(args) != 2:
                     print("Usage: remove <name>")
                 else:
                     remove_player(args[1])
+                    save_table()
             elif cmd0 == "show":
                 show_table()
             elif cmd0 == "export":
@@ -383,7 +383,12 @@ def main():
                 summary()
             elif cmd0 == "solve":
                 solve()
+            elif cmd0 == "save":
+                save_table()
+                print(f"{current_date} game saved.")
             elif cmd0 == "clear":
+                save_table()
+                print(f"{current_date} game saved.")
                 clear()
                 current_date = None
             else:
