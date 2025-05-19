@@ -184,7 +184,7 @@ def solve():
 
         # Balance = -buy_in + payment + cash_out - payout
         balance = -buy_in + payment_total + cash_out - payout_total
-        balances[name] = int(balance)
+        balances[name] = int(round(balance))
 
         total_payment += payment_total
         total_payout += payout_total
@@ -193,7 +193,7 @@ def solve():
 
     # Step 2: Bank balance
     bank_balance = total_buy_in - total_cash_out - total_payment + total_payout
-    balances["bank"] = int(bank_balance)
+    balances["bank"] = int(round(bank_balance))
 
     # Step 3: 顯示原始 balances
     print("Balances:")
@@ -201,62 +201,68 @@ def solve():
         print(f"{name}: {bal}")
     print()
 
-    # Step 4: 使用 DFS 找最少筆交易，並在每步排序最大化貪心
+    # Step 4: 使用新版 DFS + memo 找最少筆交易
     name_list = list(balances.keys())
     amount_list = list(balances.values())
+    combined = [(name, amt) for name, amt in balances.items()]
 
-    n = len(amount_list)
     min_tx = float('inf')
     best_transactions = []
+    memo = {}
 
-
-    def dfs(combined, current_transactions):
+    def dfs(state, current):
         nonlocal min_tx, best_transactions
 
-        # 排序（負的在前，正的在後，數值越大優先）
-        combined.sort(key=lambda x: (x[1] >= 0, -x[1] if x[1] > 0 else x[1]))
+        # 排序：正餘額在前，絕對值越大越優先
+        state.sort(key=lambda x: (x[1] >= 0, -abs(x[1])))
 
-        # 找第一個非零
         start = 0
-        while start < len(combined) and combined[start][1] == 0:
+        while start < len(state) and state[start][1] == 0:
             start += 1
 
-        if start == len(combined):
-            if len(current_transactions) < min_tx:
-                min_tx = len(current_transactions)
-                best_transactions = current_transactions[:]
+        if start == len(state):
+            if len(current) < min_tx:
+                min_tx = len(current)
+                best_transactions = current[:]
             return
 
-        for i in range(start + 1, len(combined)):
-            if combined[start][1] * combined[i][1] < 0:
-                transfer_amt = min(abs(combined[start][1]), abs(combined[i][1]))
+        state_key = tuple(x[1] for x in state)
+        if state_key in memo and memo[state_key] <= len(current):
+            return
+        memo[state_key] = len(current)
 
-                # 儲存原始值，做回溯用
-                original_start_amt = combined[start][1]
-                original_i_amt = combined[i][1]
+        # 最少還需要幾步
+        pos = sum(1 for _, amt in state[start:] if amt > 0)
+        neg = sum(1 for _, amt in state[start:] if amt < 0)
+        min_remaining = max(pos, neg)
+        if len(current) + min_remaining >= min_tx:
+            return
 
-                if combined[start][1] < 0:
-                    # 欠錢的人轉帳給收錢的人
-                    current_transactions.append((combined[start][0], combined[i][0], transfer_amt))
-                    combined[start] = (combined[start][0], combined[start][1] + transfer_amt)
-                    combined[i] = (combined[i][0], combined[i][1] - transfer_amt)
+        for i in range(start + 1, len(state)):
+            if state[start][1] * state[i][1] < 0:
+                amt = min(abs(state[start][1]), abs(state[i][1]))
+                original_start = state[start][1]
+                original_i = state[i][1]
+
+                if state[start][1] < 0:
+                    current.append((state[start][0], state[i][0], amt))
+                    state[start] = (state[start][0], state[start][1] + amt)
+                    state[i] = (state[i][0], state[i][1] - amt)
                 else:
-                    current_transactions.append((combined[i][0], combined[start][0], transfer_amt))
-                    combined[start] = (combined[start][0], combined[start][1] - transfer_amt)
-                    combined[i] = (combined[i][0], combined[i][1] + transfer_amt)
+                    current.append((state[i][0], state[start][0], amt))
+                    state[start] = (state[start][0], state[start][1] - amt)
+                    state[i] = (state[i][0], state[i][1] + amt)
 
-                dfs(combined[:], current_transactions)
+                dfs([x[:] if isinstance(x, list) else list(x) for x in state], current)
 
-                # 回溯
-                current_transactions.pop()
-                combined[start] = (combined[start][0], original_start_amt)
-                combined[i] = (combined[i][0], original_i_amt)
+                current.pop()
+                state[start] = (state[start][0], original_start)
+                state[i] = (state[i][0], original_i)
 
-                if original_start_amt + original_i_amt == 0:
+                if original_start + original_i == 0:
                     break
 
-    combined = [(name, amt) for name, amt in balances.items()]
-    dfs(combined, [])
+    dfs([list(x) for x in combined], [])
 
     # Step 5: 顯示轉帳
     print("Settlement Transfers:")
@@ -343,6 +349,9 @@ def main():
             if cmd0 == "game":
                 if len(args) != 2:
                     print("Usage: game <MM/DD>")
+                else if current_date:
+                    save_table()
+                    start_game(args[1])
                 else:
                     start_game(args[1])
             elif cmd0 == "history":
