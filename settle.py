@@ -349,7 +349,7 @@ def main():
             if cmd0 == "game":
                 if len(args) != 2:
                     print("Usage: game <MM/DD>")
-                else if current_date:
+                elif current_date:
                     save_table()
                     start_game(args[1])
                 else:
