@@ -308,7 +308,7 @@ def summary():
     total_cash_out = sum(d["cash_out"] for d in table.values())
     total_payment = sum(d["cash"] + d["zelle"] for d in table.values())
     total_payout = sum(d["payout_cash"] + d["payout_zelle"] for d in table.values())
-    bank_balance = total_buy_in - total_cash_out + total_payment - total_payout
+    bank_balance = total_buy_in - total_cash_out - total_payment + total_payout
 
     print("\n=== Summary ===")
     print(f"Total Buy In     : {total_buy_in:.0f}")
@@ -325,7 +325,8 @@ def export_csv():
               FROM records
         """)
         rows = c.fetchall()
-    with open("export.csv", "w", newline="") as f:
+    filename = current_date.replace("/", "_") + ".csv"
+    with open( filename, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow([
             "date", "name", "buy_in",
@@ -333,7 +334,7 @@ def export_csv():
             "payout_cash", "payout_zelle"
         ])
         writer.writerows(rows)
-    print("Exported to export.csv")
+    print("Exported to " + filename)
 
 def main():
     global current_date
