@@ -1,4 +1,3 @@
-````markdown
 # 💰 Settle.py – Poker Game Settlement Tracker
 
 一款專為 Poker 私人局或桌遊聚會設計的結帳工具，使用 SQLite 儲存資料，支援多人買入、付款、兌現、派彩與結算轉帳推薦。
@@ -38,8 +37,8 @@ SQLite 資料庫檔案：`settle.db`
 ### 啟動程式
 
 ```bash
-python3 settle.py
-````
+python3 run.py
+```
 
 ### 基本指令
 
@@ -118,4 +117,5 @@ Pull requests 與 issue 歡迎提出！
 ## 🧑‍💻 作者
 
 Daniel Huang
+
 Feel free to fork, modify, and use it for your next game night.
