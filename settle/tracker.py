@@ -4,7 +4,7 @@ import sqlite3
 import csv
 import os
 
-db_path = "settle.db"
+db_path = os.path.join("data", "settle.db")
 current_date = None
 table = {}
 
