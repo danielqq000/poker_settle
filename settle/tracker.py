@@ -5,6 +5,9 @@ import csv
 import os
 
 db_path = os.path.join("data", "settle.db")
+db_dir = os.path.dirname(db_path)
+os.makedirs(db_dir, exist_ok=True)
+
 current_date = None
 table = {}
 
