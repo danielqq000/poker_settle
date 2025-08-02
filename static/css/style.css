@@ -1,0 +1,36 @@
+.card-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+.btn-poker {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    color: white;
+}
+.btn-poker:hover {
+    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+    color: white;
+}
+.table-container {
+    max-height: 400px;
+    overflow-y: auto;
+}
+.balance-positive {
+    color: #28a745;
+    font-weight: bold;
+}
+.balance-negative {
+    color: #dc3545;
+    font-weight: bold;
+}
+.balance-zero {
+    color: #6c757d;
+}
+.settlement-card {
+    background: #f8f9fa;
+    border-left: 4px solid #28a745;
+}
+.summary-card {
+    background: #fff3cd;
+    border-left: 4px solid #ffc107;
+}
