@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poker Settlement Tracker</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-poker {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+        }
+        .btn-poker:hover {
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+            color: white;
+        }
+        .table-container {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .balance-positive {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .balance-negative {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .balance-zero {
+            color: #6c757d;
+        }
+        .settlement-card {
+            background: #f8f9fa;
+            border-left: 4px solid #28a745;
+        }
+        .summary-card {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container-fluid py-4">
+        <div class="row">
+            <div class="col-12">
+                <h1 class="text-center mb-4">
+                    <i class="fas fa-coins text-warning"></i>
+                    Poker Settlement Tracker
+                </h1>
+            </div>
+        </div>
+
+        <!-- Game Control -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-play"></i> Game Control</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-8">
+                                <input type="text" id="gameDate" class="form-control" placeholder="MM/DD (e.g., 08/01)">
+                            </div>
+                            <div class="col-4">
+                                <button class="btn btn-poker w-100" onclick="startGame()">
+                                    <i class="fas fa-play"></i> Start Game
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <small class="text-muted">Current Game: <span id="currentGame">None</span></small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-tools"></i> Actions</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="btn-group w-100" role="group">
+                            <button class="btn btn-outline-success" onclick="showSummary()">
+                                <i class="fas fa-chart-bar"></i> Summary
+                            </button>
+                            <button class="btn btn-outline-primary" onclick="calculateSettlement()">
+                                <i class="fas fa-calculator"></i> Solve
+                            </button>
+                            <button class="btn btn-outline-warning" onclick="exportData()">
+                                <i class="fas fa-download"></i> Export
+                            </button>
+                            <button class="btn btn-outline-info" onclick="saveGame()">
+                                <i class="fas fa-save"></i> Save
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Player Actions -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-user-plus"></i> Player Actions</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <!-- Buy In -->
+                            <div class="col-md-3">
+                                <div class="input-group">
+                                    <input type="text" id="buyInName" class="form-control" placeholder="Name">
+                                    <input type="number" id="buyInAmount" class="form-control" placeholder="Amount">
+                                    <button class="btn btn-success" onclick="buyIn()">
+                                        <i class="fas fa-plus"></i> Buy In
+                                    </button>
+                                </div>
+                            </div>
+                            <!-- Payment -->
+                            <div class="col-md-3">
+                                <div class="input-group">
+                                    <input type="text" id="paymentName" class="form-control" placeholder="Name">
+                                    <input type="number" id="paymentAmount" class="form-control" placeholder="Amount">
+                                    <select id="paymentMethod" class="form-select">
+                                        <option value="cash">Cash</option>
+                                        <option value="zelle">Zelle</option>
+                                    </select>
+                                    <button class="btn btn-primary" onclick="recordPayment()">
+                                        <i class="fas fa-credit-card"></i> Payment
+                                    </button>
+                                </div>
+                            </div>
+                            <!-- Cash Out -->
+                            <div class="col-md-3">
+                                <div class="input-group">
+                                    <input type="text" id="cashOutName" class="form-control" placeholder="Name">
+                                    <input type="number" id="cashOutAmount" class="form-control" placeholder="Amount">
+                                    <button class="btn btn-warning" onclick="cashOut()">
+                                        <i class="fas fa-money-bill"></i> Cash Out
+                                    </button>
+                                </div>
+                            </div>
+                            <!-- Payout -->
+                            <div class="col-md-3">
+                                <div class="input-group">
+                                    <input type="text" id="payoutName" class="form-control" placeholder="Name">
+                                    <input type="number" id="payoutAmount" class="form-control" placeholder="Amount">
+                                    <select id="payoutMethod" class="form-select">
+                                        <option value="cash">Cash</option>
+                                        <option value="zelle">Zelle</option>
+                                    </select>
+                                    <button class="btn btn-info" onclick="recordPayout()">
+                                        <i class="fas fa-hand-holding-usd"></i> Payout
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Current Table -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-table"></i> Current Table</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-container">
+                            <table class="table table-striped table-hover">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Buy In</th>
+                                        <th>Payment (Cash+Zelle)</th>
+                                        <th>Cash Out</th>
+                                        <th>Payout (Cash+Zelle)</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tableBody">
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted">No players yet</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary and Settlement -->
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card summary-card" id="summaryCard" style="display: none;">
+                    <div class="card-header bg-warning">
+                        <h5 class="mb-0 text-dark"><i class="fas fa-chart-pie"></i> Game Summary</h5>
+                    </div>
+                    <div class="card-body" id="summaryContent">
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card settlement-card" id="settlementCard" style="display: none;">
+                    <div class="card-header bg-success">
+                        <h5 class="mb-0"><i class="fas fa-exchange-alt"></i> Settlement</h5>
+                    </div>
+                    <div class="card-body" id="settlementContent">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div id="toast" class="toast" role="alert">
+            <div class="toast-header">
+                <strong class="me-auto">Notification</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body" id="toastBody">
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API_BASE = '/api';
+        let currentGameDate = null;
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            loadCurrentGame();
+        });
+
+        // Utility functions
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastBody = document.getElementById('toastBody');
+            const toastHeader = toast.querySelector('.toast-header');
+            
+            toastHeader.className = `toast-header bg-${type} text-white`;
+            toastBody.textContent = message;
+            
+            const bsToast = new bootstrap.Toast(toast);
+            bsToast.show();
+        }
+
+        function clearInputs(prefix) {
+            document.querySelectorAll(`input[id^="${prefix}"]`).forEach(input => {
+                input.value = '';
+            });
+            document.querySelectorAll(`select[id^="${prefix}"]`).forEach(select => {
+                select.selectedIndex = 0;
+            });
+        }
+
+        // API calls
+        async function apiCall(endpoint, method = 'GET', data = null) {
+            try {
+                const options = {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                };
+                
+                if (data) {
+                    options.body = JSON.stringify(data);
+                }
+                
+                const response = await fetch(API_BASE + endpoint, options);
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.error || 'API call failed');
+                }
+                
+                return result;
+            } catch (error) {
+                showToast(error.message, 'danger');
+                throw error;
+            }
+        }
+
+        // Game functions
+        async function startGame() {
+            const date = document.getElementById('gameDate').value.trim();
+            if (!date) {
+                showToast('Please enter a date (MM/DD)', 'warning');
+                return;
+            }
+            
+            try {
+                const result = await apiCall('/game/start', 'POST', { date });
+                currentGameDate = result.date;
+                document.getElementById('currentGame').textContent = result.date;
+                document.getElementById('gameDate').value = '';
+                showToast(result.message, 'success');
+                loadTable();
+            } catch (error) {
+                // Error already shown in apiCall
+            }
+        }
+
+        async function loadCurrentGame() {
+            try {
+                const result = await apiCall('/game/current');
+                currentGameDate = result.current_date;
+                document.getElementById('currentGame').textContent = result.current_date || 'None';
+                if (result.current_date) {
+                    loadTable();
+                }
+            } catch (error) {
+                // Error already shown in apiCall
+            }
+        }
+
+        async function loadTable() {
+            try {
+                const result = await apiCall('/table');
+                updateTableDisplay(result.table);
+            } catch (error) {
+                // Error already shown in apiCall
+            }
+        }
+
+        function updateTableDisplay(table) {
+            const tbody = document.getElementById('tableBody');
+            
+            if (!table || Object.keys(table).length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No players yet</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = '';
+            
+            for (const [name, data] of Object.entries(table)) {
+                const row = document.createElement('tr');
+                const paymentTotal = data.cash + data.zelle;
+                const payoutTotal = data.payout_cash + data.payout_zelle;
+                
+                row.innerHTML = `
+                    <td><strong>${name}</strong></td>
+                    <td>$${data.buy_in}</td>
+                    <td>$${paymentTotal} (${data.cash}+${data.zelle})</td>
+                    <td>$${data.cash_out}</td>
+                    <td>$${payoutTotal} (${data.payout_cash}+${data.payout_zelle})</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-danger" onclick="removePlayer('${name}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            }
+        }
+
+        // Player actions
+        async function buyIn() {
+            const name = document.getElementById('buyInName').value.trim();
+            const amount = parseInt(document.getElementById('buyInAmount').value);
+            
+            if (!name || !amount) {
+                showToast('Please enter name and amount', 'warning');
+                return;
+            }
+            
+            try {
+                const result = await apiCall('/players/buy-in', 'POST', { name, amount });
+                showToast(result.message, 'success');
+                updateTableDisplay(result.table);
+                clearInputs('buyIn');
+            } catch (error) {
+                // Error already shown in apiCall
+            }
+        }
+
+        async function recordPayment() {
+            const name = document.getElementById('paymentName').value.trim();
+            const amount = parseInt(document.getElementById('paymentAmount').value);
+            const method = document.getElementById('paymentMethod').value;
+            
+            if (!name || !amount) {
+                showToast('Please enter name and amount', 'warning');
+                return;
+            }
+            
+            try {
+                const result = await apiCall('/players/payment', 'POST', { name, amount, method });
+                showToast(result.message, 'success');
+                updateTableDisplay(result.table);
+                clearInputs('payment');
+            } catch (error) {
+                // Error already shown in apiCall
+            }
+        }
+
+        async function cashOut() {
+            const name = document.getElementById('cashOutName').value.trim();
+            const amount = parseInt(document.getElementById('cashOutAmount').value);
+            
+            if (!name || !amount) {
+                showToast('Please enter name and amount', 'warning');
+                return;
+            }
+            
+            try {
+                const result = await apiCall('/players/cash-out', 'POST', { name, amount });
+                showToast(result.message, 'success');
+                updateTableDisplay(result.table);
+                clearInputs('cashOut');
+            } catch (error) {
+                // Error already shown in apiCall
+            }
+        }
+
+        async function recordPayout() {
+            const name = document.getElementById('payoutName').value.trim();
+            const amount = parseInt(document.getElementById('payoutAmount').value);
+            const method = document.getElementById('payoutMethod').value;
+            
+            if (!name || !amount) {
+                showToast('Please enter name and amount', 'warning');
+                return;
+            }
+            
+            try {
+                const result = await apiCall('/players/payout', 'POST', { name, amount, method });
+                showToast(result.message, 'success');
+                updateTableDisplay(result.table);
+                clearInputs('payout');
+            } catch (error) {
+                // Error already shown in apiCall
+            }
+        }
+
+        async function removePlayer(name) {
+            if (!confirm(`Are you sure you want to remove ${name}?`)) {
+                return;
+            }
+            
+            try {
+                const result = await apiCall('/players/remove', 'DELETE', { name });
+                showToast(result.message, 'success');
+                updateTableDisplay(result.table);
+            } catch (error) {
+                // Error already shown in apiCall
+            }
+        }
+
+        // Summary and settlement
+        async function showSummary() {
+            try {
+                const result = await apiCall('/summary');
+                const summaryCard = document.getElementById('summaryCard');
+                const summaryContent = document.getElementById('summaryContent');
+                
+                summaryContent.innerHTML = `
+                    <div class="row">
+                        <div class="col-6">
+                            <p><strong>Total Buy In:</strong> $${result.total_buy_in}</p>
+                            <p><strong>Total Payment:</strong> $${result.total_payment}</p>
+                        </div>
+                        <div class="col-6">
+                            <p><strong>Total Cash Out:</strong> $${result.total_cash_out}</p>
+                            <p><strong>Total Payout:</strong> $${result.total_payout}</p>
+                        </div>
+                    </div>
+                    <hr>
+                    <p class="text-center"><strong>Bank Balance: $${result.bank_balance}</strong></p>
+                `;
+                
+                summaryCard.style.display = 'block';
+                showToast('Summary updated', 'info');
+            } catch (error) {
+                // Error already shown in apiCall
+            }
+        }
+
+        async function calculateSettlement() {
+            try {
+                const result = await apiCall('/solve');
+                const settlementCard = document.getElementById('settlementCard');
+                const settlementContent = document.getElementById('settlementContent');
+                
+                let content = '<h6>Player Balances:</h6><ul class="list-unstyled">';
+                for (const [name, balance] of Object.entries(result.balances)) {
+                    const balanceClass = balance > 0 ? 'balance-positive' : balance < 0 ? 'balance-negative' : 'balance-zero';
+                    content += `<li><span class="${balanceClass}">${name}: $${balance}</span></li>`;
+                }
+                content += '</ul>';
+                
+                if (result.transactions.length > 0) {
+                    content += '<h6>Settlement Transfers:</h6><ul class="list-unstyled">';
+                    result.transactions.forEach(tx => {
+                        content += `<li><i class="fas fa-arrow-right text-success"></i> ${tx.payer} pays ${tx.receiver} <strong>$${tx.amount}</strong></li>`;
+                    });
+                    content += '</ul>';
+                } else {
+                    content += '<p class="text-muted">No transfers needed</p>';
+                }
+                
+                if (Object.keys(result.missing_balances).length > 0) {
+                    content += '<h6>Remaining Balances:</h6><ul class="list-unstyled">';
+                    for (const [name, balance] of Object.entries(result.missing_balances)) {
+                        const balanceClass = balance > 0 ? 'balance-positive' : 'balance-negative';
+                        content += `<li><span class="${balanceClass}">${name}: $${balance}</span></li>`;
+                    }
+                    content += '</ul>';
+                }
+                
+                content += `<hr><p class="text-center"><strong>Final Bank Balance: $${result.final_bank_balance}</strong></p>`;
+                
+                settlementContent.innerHTML = content;
+                settlementCard.style.display = 'block';
+                showToast('Settlement calculated', 'success');
+            } catch (error) {
+                // Error already shown in apiCall
+            }
+        }
+
+        async function exportData() {
+            try {
+                const result = await apiCall('/export');
+                showToast(result.message, 'success');
+            } catch (error) {
+                // Error already shown in apiCall
+            }
+        }
+
+        async function saveGame() {
+            try {
+                const result = await apiCall('/save', 'POST');
+                showToast(result.message, 'success');
+            } catch (error) {
+                // Error already shown in apiCall
+            }
+        }
+    </script>
+</body>
+</html>
