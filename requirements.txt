@@ -1,2 +1,4 @@
 Flask==2.3.3
 Flask-CORS==4.0.0
+
+inflect~=7.5.0  # Used in exception.py
